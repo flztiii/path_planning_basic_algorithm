@@ -55,8 +55,8 @@ class QuinticPolynomial:
 # 五次多项式规划
 def quinticPolynumialPlanning(start_pose, start_motion, goal_pose, goal_motion, max_accel, max_jerk, dt):
     # 初始化参数
-    params_x = [start_pose[0], start_motion[0] * np.cos(start_pose[2]), start_motion[1] * np.cos(start_pose[2]), goal_pose[0], goal_motion[0] * np.cos(goal_pose[2]), goal_motion[1] * np.cos(goal_pose[2])]
-    params_y = [start_pose[1], start_motion[0] * np.sin(start_pose[2]), start_motion[1] * np.sin(start_pose[2]), goal_pose[1], goal_motion[0] * np.sin(goal_pose[2]), goal_motion[1] * np.sin(goal_pose[2])]
+    params_x = [start_pose[0], start_motion[0] * np.cos(start_pose[2]), start_motion[1] * np.cos(start_pose[2]) - start_motion[0]**2 * start_pose[3] * np.sin(start_pose[2]), goal_pose[0], goal_motion[0] * np.cos(goal_pose[2]), goal_motion[1] * np.cos(goal_pose[2]) - goal_motion[0]**2 * goal_pose[3] * np.sin(goal_pose[2])]
+    params_y = [start_pose[1], start_motion[0] * np.sin(start_pose[2]), start_motion[1] * np.sin(start_pose[2]) + start_motion[0]**2 * start_pose[3] * np.cos(start_pose[2]), goal_pose[1], goal_motion[0] * np.sin(goal_pose[2]), goal_motion[1] * np.sin(goal_pose[2]) + goal_motion[0]**2 * goal_pose[3] * np.cos(goal_pose[2])]
     # 最终的路径，速度，加速度，加速度变化率在时间轴上的采样
     final_path, final_vels, final_accs, final_jerks, final_times = [], [], [], [], []
     # 遍历时间
@@ -78,7 +78,7 @@ def quinticPolynumialPlanning(start_pose, start_motion, goal_pose, goal_motion, 
             sample_ddy = yqp.calc2Derivation(sample_t)
             sample_dddy = yqp.calc3Derivation(sample_t)
             # 采样点位置
-            sample_pose = [sample_x, sample_y, np.arctan2(sample_dy, sample_dx)]
+            sample_pose = [sample_x, sample_y, np.arctan2(sample_dy, sample_dx), (sample_ddy * sample_dx - sample_ddx * sample_dy) / ((sample_dx ** 2 + sample_dy ** 2)**(3 / 2))]
             path.append(sample_pose)
             # 采样点运动信息
             sample_vel = np.hypot(sample_dx, sample_dy)
@@ -118,9 +118,9 @@ def plotArrow(x, y, yaw, length=1.0, width=0.5, fc="r", ec="k"):  # pragma: no c
 # 主函数
 def main():
     # 初始化边界条件和限制条件
-    start_pose = [10.0, 10.0, np.deg2rad(10.0)]  # 起点位置x,y,yaw
+    start_pose = [10.0, 10.0, np.deg2rad(10.0), 0.0]  # 起点位置x,y,yaw,kappa
     start_motion = [1.0, 0.1]  # 起点运动v,a
-    goal_pose = [30.0, -10.0, np.deg2rad(20.0)]  # 终点位置
+    goal_pose = [30.0, -10.0, np.deg2rad(20.0), 0.0]  # 终点位置
     goal_motion = [1.0, 0.1]  # 终点运动
     max_accel = 1.0  # max accel [m/ss]
     max_jerk = 0.5  # max jerk [m/sss]
@@ -134,9 +134,9 @@ def main():
         plt.cla()  # 清楚之前的绘制信息
         plt.grid(True)  # 绘制网格
         plt.axis("equal")  # 绘制坐标
-        plotArrow(*start_pose)  # 绘制起点
-        plotArrow(*goal_pose)  # 绘制终点
-        plotArrow(*(final_path[i]))  # 绘制当前位置
+        plotArrow(start_pose[0], start_pose[1], start_pose[2])  # 绘制起点
+        plotArrow(goal_pose[0], goal_pose[1], goal_pose[2])  # 绘制终点
+        plotArrow(final_path[i][0], final_path[i][1], final_path[i][2])  # 绘制当前位置
         plt.title("Time[s]:" + str(time)[0:4] +
                   " v[m/s]:" + str(final_vels[i])[0:4] +
                   " a[m/ss]:" + str(final_accs[i])[0:4] +
@@ -150,6 +150,12 @@ def main():
     plt.plot(final_times, [np.rad2deg(i) for i in final_path[:, 2]], "-r")
     plt.xlabel("Time[s]")
     plt.ylabel("Yaw[deg]")
+    plt.grid(True)
+    # 可视化曲率随时间变化曲线
+    plt.subplots()
+    plt.plot(final_times, final_path[:, 3], "-r")
+    plt.xlabel("Time[s]")
+    plt.ylabel("Curvature[deg/s]")
     plt.grid(True)
     # 可视化速度随时间变化曲线
     plt.subplots()
